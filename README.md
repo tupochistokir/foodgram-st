@@ -1,4 +1,54 @@
-Находясь в папке infra, выполните команду docker-compose up. При выполнении этой команды контейнер frontend, описанный в docker-compose.yml, подготовит файлы, необходимые для работы фронтенд-приложения, а затем прекратит свою работу.
+## Быстрый старт
 
-По адресу http://localhost изучите фронтенд веб-приложения, а по адресу http://localhost/api/docs/ — спецификацию API.
+1. Клонируйте репозиторий:
+
+   ```bash
+   git clone 
+   cd infra
+   ```
+
+2. Соберите и запустите контейнеры:
+
+   ```bash
+    docker-compose up --build
+   ```
+
+3. Откройте в браузере:
+
+   * API: `http://localhost:8000/api/`
+   * Документация (Swagger/OpenAPI): `http://localhost:8000/api/docs/`
+
+## Остановка и очистка
+
+* Остановить все контейнеры и удалить их:
+
+  ```bash
+  docker-compose down -v
+  ```
+
+
+## Полезные команды
+
+* Просмотр логов:
+
+  ```bash
+  docker-compose logs -f backend
+  docker-compose logs -f db
+  docker-compose logs -f proxy
+  ```
+
+
+## Структура проекта
+
+```
+├── api/               # Главный модуль с маршрутами и утилитами
+├── users/             # Приложение пользователей и подписок
+├── recipes/           # Приложение рецептов и ингредиентов
+├── add_components/    # Дополнительные пакеты и плагины
+├── Dockerfile         # Сборка backend-контейнера
+├── docker-compose.yml # Описание сервисов: proxy, db, backend
+├── .env.example       # Пример файла окружения
+├── manage.py
+└── README.md
+```
 
