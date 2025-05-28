@@ -1,7 +1,7 @@
 from django.db.models import Sum
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import FileResponse
@@ -17,6 +17,9 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from django.utils.crypto import get_random_string
 
+
+SHORT_CODE_LENGTH = 3
+SHORT_LINK_PATH = '/recipes/s/'
 
 class IsAuthorOrReadOnly(IsAuthenticatedOrReadOnly):
     def has_object_permission(self, request, view, obj):
@@ -117,9 +120,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
             content_type='application/pdf',
         )
 
-    @action(detail=True, methods=['GET'], url_path='get-link',
-            permission_classes=[])
+    @action(
+        detail=True,
+        methods=['GET'],
+        url_path='get-link',
+        permission_classes=(AllowAny,)
+    )
     def get_link(self, request, pk=None):
-        code = get_random_string(3)         
-        short = request.build_absolute_uri(f'/recipes/s/{code}')
-        return Response({'short-link': short})
+        """
+        Генерирует короткий код длиной SHORT_CODE_LENGTH
+        и отдаёт полный URL вида https://…/recipes/s/{code}
+        """
+        code = get_random_string(SHORT_CODE_LENGTH)
+        short_url = request.build_absolute_uri(f'{SHORT_LINK_PATH}{code}')
+        return Response(
+            {'short-link': short_url},
+            status=status.HTTP_200_OK
+        )

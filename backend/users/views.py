@@ -9,7 +9,7 @@ import uuid
 import imghdr
 from django.core.files.base import ContentFile
 from .models import Subscription
-from .serializers import SubscriptionSerializer
+from .serializers import SubscriptionSerializer, SubscribeActionSerializer
 
 
 class CustomUserViewSet(DjoserUserViewSet):
@@ -25,35 +25,27 @@ class CustomUserViewSet(DjoserUserViewSet):
         """
         return super().me(request, *args, **kwargs)
 
-    @action(
-        detail=True,
-        methods=['POST', 'DELETE'],
-        permission_classes=[IsAuthenticated],
-        url_path='subscribe'
-    )
+    @action(detail=True, methods=['POST', 'DELETE'],
+            permission_classes=[IsAuthenticated], url_path='subscribe')
     def subscribe(self, request, id=None):
         author = get_object_or_404(self.get_queryset(), pk=id)
-        user = request.user
-        if user == author:
-            return Response({'errors': 'Нельзя подписаться на себя'},
-                            status=status.HTTP_400_BAD_REQUEST)
 
         if request.method == 'POST':
-            sub, created = Subscription.objects.get_or_create(
-                user=user, author=author
+            serializer = SubscribeActionSerializer(
+                data={},
+                context={'request': request, 'author': author},
             )
-            if not created:
-                return Response({'errors': 'Уже подписаны'},
-                                status=status.HTTP_400_BAD_REQUEST)
+            serializer.is_valid(raise_exception=True)
+
+            request.user.subscriptions.create(author=author)
+
             data = SubscriptionSerializer(
                 author, context=self.get_serializer_context()
             ).data
             return Response(data, status=status.HTTP_201_CREATED)
 
-        # DELETE
-        deleted, _ = Subscription.objects.filter(
-            user=user, author=author
-        ).delete()
+        # ----- DELETE -----
+        deleted, _ = request.user.subscriptions.filter(author=author).delete()
         if not deleted:
             return Response({'errors': 'Подписки не существует'},
                             status=status.HTTP_400_BAD_REQUEST)

@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from drf_extra_fields.fields import Base64ImageField
 from recipes.serializers import RecipeShortSerializer
 from .models import Subscription
 
@@ -8,50 +7,69 @@ User = get_user_model()
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Регистрация: возвращаем только 5 полей, без is_subscribed/avatar."""
-
+    """Регистрация нового пользователя — без is_subscribed и avatar."""
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'first_name', 'last_name',
-                  'email', 'password')
-        # требуем оба имени, иначе DRF сам отдаст 400
+        fields = (
+            'id', 'username', 'first_name', 'last_name',
+            'email', 'password',
+        )
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
         }
 
-    def create(self, data):
-        return User.objects.create_user(**data)
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Карточка пользователя (везде)."""
     avatar = serializers.SerializerMethodField()
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        # порядок полей важен для автотестов
         fields = (
             'id', 'username', 'first_name', 'last_name',
             'email', 'is_subscribed', 'avatar',
         )
 
+    # --- helpers -------------------------------------------------
+    def get_avatar(self, obj):
+        if not obj.avatar:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.avatar.url) if request else obj.avatar.url
+
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
         if not request or request.user.is_anonymous:
             return False
-        return Subscription.objects.filter(user=request.user,
-                                           author=obj).exists()
+        # читаем через related_name — subscriptions
+        return request.user.subscriptions.filter(author=obj).exists()
 
-    def get_avatar(self, obj):
-        """null → null, файл → абсолютный URL-string"""
-        if not obj.avatar:
-            return None
-        req = self.context.get('request')
-        return req.build_absolute_uri(obj.avatar.url) if req else obj.avatar.url
+
+class SubscribeActionSerializer(serializers.Serializer):
+    """
+    Пустой технический сериализатор.
+    Проверяет:
+      • нельзя подписаться на себя,
+      • нельзя подписаться повторно.
+    """
+
+    def validate(self, attrs):
+        request = self.context['request']
+        author = self.context['author']
+
+        if request.user == author:
+            raise serializers.ValidationError('Нельзя подписаться на себя')
+
+        if request.user.subscriptions.filter(author=author).exists():
+            raise serializers.ValidationError('Уже подписаны')
+
+        return attrs
 
 
 class SubscriptionSerializer(UserSerializer):
